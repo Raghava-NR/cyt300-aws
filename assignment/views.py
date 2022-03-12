@@ -13,11 +13,14 @@ import base64
 import logging
 from django.http import HttpResponse
 from botocore.exceptions import ClientError
+import uuid
+from django.http import FileResponse
 
 
 
 NUM_BYTES_FOR_LEN = 4
-
+TEMP_FILE_NAME = 'temp_file.pdf'
+CONTENT_TYPE_ALLOWED = 'application/pdf'
 
 
 def index(request):
@@ -128,7 +131,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         return base64.b64encode((response['Plaintext']))
 
 
-    def encrypt_file(self, filename, cmk_id):
+    def encrypt_file(self, filename, cmk_id=settings.AWS_KMS_KEY_ID):
 
         """Encrypt a file using an AWS KMS CMK
 
@@ -185,7 +188,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
     def decrypt_file(self, filename):
         """Decrypt a file encrypted by encrypt_file()
 
-        The encrypted file is read from <filename>.encrypted
+        The encrypted file is read from <filename>
         The decrypted file is written to <filename>.decrypted
 
         :param filename: File to decrypt
@@ -194,7 +197,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
         # Read the encrypted file into memory
         try:
-            with open(filename + '.encrypted', 'rb') as file:
+            with open(filename, 'rb') as file:
                 file_contents = file.read()
         except IOError as e:
             logging.error(e)
@@ -230,6 +233,103 @@ class SubmissionViewSet(viewsets.ModelViewSet):
         # here, too, i.e., the wish to wipe the data_key_plaintext value from
         # memory.
         return True
+
+
+    @staticmethod
+    def upload_file_to_s3(file_name, s3_path):
+
+        s3 = boto3.resource('s3')
+
+        s3.Bucket(settings.AWS_S3_BUCKET_NAME).upload_file(file_name, s3_path)
+
+
+    @action(detail=False, methods=["POST"])
+    def encrypt_file_api(self, request):
+
+
+        file = request.FILES['file']
+
+        if file.content_type != CONTENT_TYPE_ALLOWED:
+            return Response({"Success": False, "message": "Only PDF is allowed"},
+                        status=status.HTTP_200_OK)
+
+
+        with open(TEMP_FILE_NAME, 'wb') as temp:
+
+            temp.write(request.FILES['file'].file.getbuffer())
+
+        file_encryption_status = self.encrypt_file(TEMP_FILE_NAME)
+
+        if not file_encryption_status:
+
+            return Response({"Success": False, "message": "Couldn't encrypt given file"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        s3_path = uuid.uuid4() + '.pdf'
+
+        self.upload_file_to_s3(TEMP_FILE_NAME+'.encrypted', s3_path)
+
+        return Response({"Success": True, "message": "PDF encrypted and uploaded to S3.",
+                         "s3_file_path": s3_path},
+                        status=status.HTTP_200_OK)
+
+
+    def download_s3_file_to_temp(self, s3_path):
+
+        s3 = boto3.resource('s3')
+
+        s3.Bucket(settings.AWS_S3_BUCKET_NAME).download_file(s3_path, TEMP_FILE_NAME)
+
+
+
+
+    @action(detail=False, methods=["POST"])
+    def decrypt_file_api(self, request):
+
+        s3_file_path = request.data["s3_file_path"]
+
+        # download file
+
+        try:
+
+            self.download_s3_file_to_temp(s3_file_path)
+
+        except ClientError as e:
+
+            if e.response['Error']['Code'] == "404":
+                print("The object does not exist.")
+                return Response({"Success": False, "message": "File not found in S3"},
+                        status=status.HTTP_404_NOT_FOUND)
+
+            else:
+                return Response(
+                    {"Success": False, "message": "Couldn't decrypt given file"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        file_decryption_status = self.decrypt_file(TEMP_FILE_NAME)
+
+        if not file_decryption_status:
+            return Response(
+                {"Success": False, "message": "Couldn't decrypt given file"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        temp_file = open(TEMP_FILE_NAME + '.decrypted', 'rb')
+
+        response = FileResponse(temp_file)
+
+        return response
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

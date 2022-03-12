@@ -6,3 +6,6 @@ __pycache__/
 *.pot
 *.pyc
 .idea/
+temp_file.pdf
+temp_file.pdf.encrypted
+temp_file.pdf.decrypted
