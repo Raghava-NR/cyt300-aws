@@ -265,7 +265,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
             return Response({"Success": False, "message": "Couldn't encrypt given file"},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        s3_path = uuid.uuid4() + '.pdf'
+        s3_path = str(uuid.uuid4()) + '.pdf'
 
         self.upload_file_to_s3(TEMP_FILE_NAME+'.encrypted', s3_path)
 
