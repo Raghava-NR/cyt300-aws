@@ -280,9 +280,6 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
         s3.Bucket(settings.AWS_S3_BUCKET_NAME).download_file(s3_path, TEMP_FILE_NAME)
 
-
-
-
     @action(detail=False, methods=["POST"])
     def decrypt_file_api(self, request):
 
@@ -315,7 +312,7 @@ class SubmissionViewSet(viewsets.ModelViewSet):
 
         temp_file = open(TEMP_FILE_NAME + '.decrypted', 'rb')
 
-        response = FileResponse(temp_file)
+        response = FileResponse(temp_file, filename=s3_file_path)
 
         return response
 
