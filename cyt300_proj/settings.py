@@ -160,4 +160,4 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # PROJECT SETTINGS
 AWS_KMS_KEY_ID = secrets_dict["AWS_KMS_KEY_ID"]
 
-AWS_S3_BUCKET_NAME = secrets_dict["cyt300-kms-demo"]
+AWS_S3_BUCKET_NAME = secrets_dict["AWS_S3_BUCKET_NAME"]
