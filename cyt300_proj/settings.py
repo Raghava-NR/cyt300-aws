@@ -12,6 +12,32 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
+import boto3
+import json
+
+
+
+AWS_SECRET_MANAGER_NAME = "arn:aws:secretsmanager:us-east-1:831323688884:secret:cyt300_app-cM80SW"
+AWS_REGION = "us-east-1"
+
+
+
+session = boto3.session.Session()
+
+
+client = session.client(
+    service_name='secretsmanager',
+    region_name=AWS_REGION
+)
+
+get_secret_value_response = client.get_secret_value(
+    SecretId=AWS_SECRET_MANAGER_NAME
+)
+
+secrets_string = get_secret_value_response['SecretString']
+
+secrets_dict = json.loads(secrets_string)
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +47,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '5oi)tyykg_k^2so@j+1#55pl&pye9+72bd5te7ko^_dzexwlm8'
+SECRET_KEY = secrets_dict["SECRET_KEY"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -132,7 +158,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # PROJECT SETTINGS
-AWS_REGION = 'us-east-1'
-AWS_KMS_KEY_ID = '42e81a48-03cf-4593-b8c9-783fe837b021'
+AWS_KMS_KEY_ID = secrets_dict["AWS_KMS_KEY_ID"]
 
-AWS_S3_BUCKET_NAME = 'cyt300-kms-demo'
+AWS_S3_BUCKET_NAME = secrets_dict["cyt300-kms-demo"]
